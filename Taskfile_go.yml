@@ -1,0 +1,84 @@
+# vim: ft=taskfile syntax=yaml
+version: "3"
+
+vars:
+  GO: '{{default "go" .GO}}'
+  GO_BIN: "{{.PWD}}/.gobin"
+  GO_CACHE_DIR: "{{.PWD}}/.cache"
+  GO_PREFIX: env PATH="$GOBIN:$PATH"
+
+env:
+  GOBIN: "{{.GO_BIN}}"
+
+tasks:
+  generate:
+    desc: Runs go generate
+    cmds:
+      - "{{.GO_PREFIX}} {{.GO}} generate ./..."
+
+  install:
+    cmds:
+      - "{{.GO}} install -v {{.GO_INSTALL_URL}}@{{.GO_INSTALL_VERSION}}"
+    generates:
+      - "{{.GO_BIN}}/{{.GO_INSTALL_BIN}}"
+    sources:
+      - "{{.GO_BIN}}/*"
+    vars:
+      GO_INSTALL_VERSION: '{{default "latest" .GO_INSTALL_VERSION}}'
+
+  tidy:
+    cmds:
+      - "{{.GO}} mod tidy"
+      - "{{.GO}} mod vendor"
+
+  test:
+    desc: Run tests
+    cmds:
+      - "{{.GO_GOTESTSUM}} --junitfile report.xml --format standard-verbose -- -race -cover -coverprofile=coverage.out -tags=integration ./... -timeout=120m"
+    vars:
+      GO_GOTESTSUM_VERSION: '{{default "v1.7.0" .GO_GOTESTSUM_VERSION}}'
+      GO_GOTESTSUM: "{{.GO}} run gotest.tools/gotestsum@{{.GO_GOTESTSUM_VERSION}}"
+
+  lint:
+    desc: Run linters
+    cmds:
+      - "{{.GO_GOLANGCI_LINT}} run"
+    env:
+      GOLANGCI_LINT_CACHE: "{{.CACHE_DIR}}/golangci-lint"
+    vars:
+      GO_GOLANGCI_LINT_VERSION: v1.48.0
+      GO_GOLANGCI_LINT: "{{.GO}} run github.com/golangci/golangci-lint/cmd/golangci-lint@{{.GO_GOLANGCI_LINT_VERSION}}"
+
+  goreleaser:
+    cmds:
+      - "{{.GO_GORELEASER}} {{.GO_GORELEASER_ARGS}}"
+    env:
+      GORELEASER_CURRENT_TAG: "{{if .GO_GORELEASER_TAG}}{{.GO_GORELEASER_TAG}}{{end}}"
+    vars:
+      GO_GORELEASER_VERSION: v1.9.2
+      GO_GORELEASER: "{{.GO}} run github.com/goreleaser/goreleaser@{{.GO_GORELEASER_VERSION}}"
+
+  build:
+    desc: Build
+    cmds:
+      - task: goreleaser
+        vars:
+          GO_GORELEASER_ARGS: build --rm-dist --snapshot
+          GO_GORELEASER_TAG: v0.0.0
+
+  release:dev:
+    desc: Release snapshot
+    cmds:
+      - task: goreleaser
+        vars:
+          ARGS: release --rm-dist --snapshot --skip-publish
+          TAG: "{{.GO_GORELEASER_TAG}}"
+    vars:
+      GO_GORELEASER_TAG: '{{default "v0.0.0" .GO_GORELEASER_TAG}}'
+
+  release:prod:
+    desc: Release
+    cmds:
+      - task: goreleaser
+        vars:
+          GO_GORELEASER_ARGS: release --rm-dist
