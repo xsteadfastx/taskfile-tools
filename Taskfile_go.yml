@@ -71,8 +71,8 @@ tasks:
     cmds:
       - task: goreleaser
         vars:
-          ARGS: release --rm-dist --snapshot --skip-publish
-          TAG: "{{.GO_GORELEASER_TAG}}"
+          GO_GORELEASER_ARGS: release --rm-dist --snapshot --skip-publish
+          GO_GORELEASER_TAG: "{{.GO_GORELEASER_TAG}}"
     vars:
       GO_GORELEASER_TAG: '{{default "v0.0.0" .GO_GORELEASER_TAG}}'
 
